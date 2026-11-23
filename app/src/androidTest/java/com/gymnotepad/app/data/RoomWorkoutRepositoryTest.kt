@@ -1,6 +1,7 @@
 package com.gymnotepad.app.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,15 +18,17 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class RoomWorkoutRepositoryTest {
     private lateinit var database: GymDatabase
     private lateinit var repository: RoomWorkoutRepository
+    private lateinit var context: Context
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        context = ApplicationProvider.getApplicationContext()
         database = Room.inMemoryDatabaseBuilder(context, GymDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -182,5 +185,27 @@ class RoomWorkoutRepositoryTest {
         repository.deleteBodyWeight(saved.first().id)
         val afterDeletion = repository.observeBodyWeight().first { it.size == 1 }
         assertEquals(saved.last().weightGrams, afterDeletion.single().weightGrams)
+    }
+
+    @Test
+    fun backupRestoresDatabaseAndSettings() = runBlocking<Unit> {
+        val settings = UserSettingsRepository(context)
+        val backup = BackupRepository(context, database, settings)
+        repository.ensureStarterData()
+        repository.saveBodyWeight(82_400)
+        settings.setWeightUnit(WeightUnit.POUNDS)
+        settings.setRestSeconds(120)
+        val file = File(context.cacheDir, "backup-test.json")
+
+        backup.exportTo(Uri.fromFile(file))
+        repository.observeBodyWeight().first { it.isNotEmpty() }.forEach { repository.deleteBodyWeight(it.id) }
+        settings.setWeightUnit(WeightUnit.KILOGRAMS)
+        backup.importFrom(Uri.fromFile(file))
+
+        assertEquals(82_400L, repository.observeBodyWeight().first { it.isNotEmpty() }.single().weightGrams)
+        assertEquals(WeightUnit.POUNDS, settings.settings.value.weightUnit)
+        assertEquals(120, settings.settings.value.restSeconds)
+        assertEquals(1, repository.observeTemplates().first { it.isNotEmpty() }.size)
+        file.delete()
     }
 }

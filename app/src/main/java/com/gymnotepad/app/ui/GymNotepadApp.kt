@@ -18,6 +18,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
     val bodyWeight = viewModel.bodyWeight.collectAsStateWithLifecycle().value
     val lastCompletedSessionId = viewModel.lastCompletedSessionId.collectAsStateWithLifecycle().value
     val settings = viewModel.settings.collectAsStateWithLifecycle().value
+    val backupMessage = viewModel.backupMessage.collectAsStateWithLifecycle().value
 
     NavHost(
         navController = navController,
@@ -114,6 +115,10 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
                 onWeightUnitChange = viewModel::setWeightUnit,
                 onRestSecondsChange = viewModel::setRestSeconds,
                 onAutoStartChange = viewModel::setAutoStartRestTimer,
+                backupMessage = backupMessage,
+                onExportBackup = viewModel::exportBackup,
+                onImportBackup = viewModel::importBackup,
+                onMessageShown = viewModel::clearBackupMessage,
                 onNavigate = { navController.navigate(it.route) },
             )
         }

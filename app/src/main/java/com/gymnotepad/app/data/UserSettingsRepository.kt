@@ -3,6 +3,7 @@ package com.gymnotepad.app.data
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.json.JSONObject
 
 enum class WeightUnit { KILOGRAMS, POUNDS }
 
@@ -20,6 +21,14 @@ class UserSettingsRepository(context: Context) {
     fun setWeightUnit(unit: WeightUnit) = update(mutableSettings.value.copy(weightUnit = unit))
     fun setRestSeconds(seconds: Int) = update(mutableSettings.value.copy(restSeconds = seconds.coerceIn(30, 600)))
     fun setAutoStartRestTimer(enabled: Boolean) = update(mutableSettings.value.copy(autoStartRestTimer = enabled))
+
+    fun replaceFromBackup(json: JSONObject) = update(
+        UserSettings(
+            weightUnit = WeightUnit.valueOf(json.getString("weightUnit")),
+            restSeconds = json.getInt("restSeconds").coerceIn(30, 600),
+            autoStartRestTimer = json.getBoolean("autoStartRestTimer"),
+        ),
+    )
 
     private fun read() = UserSettings(
         weightUnit = runCatching { WeightUnit.valueOf(preferences.getString("weight-unit", null).orEmpty()) }

@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
         WorkoutViewModel.Factory(
             (application as GymNotepadApplication).workoutRepository,
             (application as GymNotepadApplication).userSettingsRepository,
+            (application as GymNotepadApplication).backupRepository,
         )
     }
 

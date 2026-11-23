@@ -26,15 +26,19 @@ import com.gymnotepad.app.domain.LoadMode
 import com.gymnotepad.app.domain.LoadProgressionType
 import com.gymnotepad.app.data.UserSettingsRepository
 import com.gymnotepad.app.data.WeightUnit
+import com.gymnotepad.app.data.BackupRepository
+import android.net.Uri
 
 class WorkoutViewModel(
     private val repository: WorkoutRepository,
     private val settingsRepository: UserSettingsRepository,
+    private val backupRepository: BackupRepository,
 ) : ViewModel() {
     private val analytics = WorkoutAnalytics()
     private val recommendationEngine = WorkoutRecommendationEngine()
     val lastCompletedSessionId = MutableStateFlow<String?>(null)
     val settings = settingsRepository.settings
+    val backupMessage = MutableStateFlow<String?>(null)
 
     val activeWorkout: StateFlow<ActiveWorkout?> = repository.observeActiveWorkout()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -189,14 +193,27 @@ class WorkoutViewModel(
     fun setRestSeconds(seconds: Int) = settingsRepository.setRestSeconds(seconds)
     fun setAutoStartRestTimer(enabled: Boolean) = settingsRepository.setAutoStartRestTimer(enabled)
 
+    fun exportBackup(uri: Uri) = viewModelScope.launch {
+        backupMessage.value = runCatching { backupRepository.exportTo(uri); "Резервная копия сохранена" }
+            .getOrElse { "Ошибка экспорта: ${it.message}" }
+    }
+
+    fun importBackup(uri: Uri) = viewModelScope.launch {
+        backupMessage.value = runCatching { backupRepository.importFrom(uri); "Данные восстановлены" }
+            .getOrElse { "Ошибка восстановления: ${it.message}" }
+    }
+
+    fun clearBackupMessage() { backupMessage.value = null }
+
     class Factory(
         private val repository: WorkoutRepository,
         private val settingsRepository: UserSettingsRepository,
+        private val backupRepository: BackupRepository,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(WorkoutViewModel::class.java))
-            return WorkoutViewModel(repository, settingsRepository) as T
+            return WorkoutViewModel(repository, settingsRepository, backupRepository) as T
         }
     }
 }
