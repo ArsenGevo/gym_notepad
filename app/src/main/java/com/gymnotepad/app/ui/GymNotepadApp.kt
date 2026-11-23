@@ -17,6 +17,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
     val recommendations = viewModel.recommendations.collectAsStateWithLifecycle().value
     val bodyWeight = viewModel.bodyWeight.collectAsStateWithLifecycle().value
     val lastCompletedSessionId = viewModel.lastCompletedSessionId.collectAsStateWithLifecycle().value
+    val settings = viewModel.settings.collectAsStateWithLifecycle().value
 
     NavHost(
         navController = navController,
@@ -29,6 +30,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
                 bodyWeight = bodyWeight,
                 onSaveBodyWeight = viewModel::saveBodyWeight,
                 onDeleteBodyWeight = viewModel::deleteBodyWeight,
+                weightUnit = settings.weightUnit,
                 onStartWorkout = { navController.navigate(AppRoute.StartWorkout.route) },
                 onContinueWorkout = { navController.navigate(AppRoute.ActiveWorkout.route) },
                 onNavigate = { route -> navController.navigate(route.route) },
@@ -53,6 +55,9 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
             ActiveWorkoutScreen(
                 workout = activeWorkout,
                 exercises = exercises,
+                weightUnit = settings.weightUnit,
+                defaultRestSeconds = settings.restSeconds,
+                defaultAutoStartRestTimer = settings.autoStartRestTimer,
                 onSaveSet = viewModel::saveSet,
                 onAddExercise = viewModel::addExerciseToActiveWorkout,
                 onReplaceExercise = viewModel::replaceActiveExercise,
@@ -74,6 +79,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
             WorkoutSummaryScreen(
                 workout = summaryWorkout,
                 recommendations = if (history.firstOrNull()?.id == lastCompletedSessionId) recommendations else emptyList(),
+                weightUnit = settings.weightUnit,
                 onDone = {
                     navController.navigate(AppRoute.Home.route) {
                         popUpTo(AppRoute.Home.route) { inclusive = true }
@@ -86,6 +92,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
                 history = history,
                 progress = progress,
                 bodyWeight = bodyWeight,
+                weightUnit = settings.weightUnit,
                 onNavigate = { navController.navigate(it.route) },
             )
         }
@@ -102,10 +109,11 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
             )
         }
         composable(AppRoute.Settings.route) {
-            PlaceholderScreen(
-                title = "Настройки",
-                message = "Единицы, таймер, уведомления и резервная копия.",
-                currentRoute = AppRoute.Settings,
+            SettingsScreen(
+                settings = settings,
+                onWeightUnitChange = viewModel::setWeightUnit,
+                onRestSecondsChange = viewModel::setRestSeconds,
+                onAutoStartChange = viewModel::setAutoStartRestTimer,
                 onNavigate = { navController.navigate(it.route) },
             )
         }

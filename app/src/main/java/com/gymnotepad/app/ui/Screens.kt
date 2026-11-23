@@ -53,7 +53,10 @@ import com.gymnotepad.app.data.BodyWeightMeasurement
 import com.gymnotepad.app.data.ExerciseDefinition
 import com.gymnotepad.app.data.WorkoutSet
 import com.gymnotepad.app.data.WorkoutTemplate
-import java.math.BigDecimal
+import com.gymnotepad.app.data.WeightUnit
+import com.gymnotepad.app.domain.symbol
+import com.gymnotepad.app.domain.toWeightGrams
+import com.gymnotepad.app.domain.toWeightText
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,6 +77,7 @@ fun HomeScreen(
     bodyWeight: List<BodyWeightMeasurement>,
     onSaveBodyWeight: (Long) -> Unit,
     onDeleteBodyWeight: (String) -> Unit,
+    weightUnit: WeightUnit,
     onStartWorkout: () -> Unit,
     onContinueWorkout: () -> Unit,
     onNavigate: (AppRoute) -> Unit,
@@ -81,7 +85,7 @@ fun HomeScreen(
     var showWeightDialog by rememberSaveable { mutableStateOf(false) }
     var weightInput by rememberSaveable { mutableStateOf("") }
     var weightToDelete by rememberSaveable { mutableStateOf<String?>(null) }
-    val parsedWeight = weightInput.toKgGrams()
+    val parsedWeight = weightInput.toWeightGrams(weightUnit)
     val latestWeight = bodyWeight.firstOrNull()
 
     if (showWeightDialog) {
@@ -92,7 +96,7 @@ fun HomeScreen(
                 OutlinedTextField(
                     value = weightInput,
                     onValueChange = { weightInput = it },
-                    label = { Text("Вес, кг") },
+                    label = { Text("Вес, ${weightUnit.symbol}") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     supportingText = { Text("Допустимый диапазон: 20–500 кг") },
@@ -196,14 +200,14 @@ fun HomeScreen(
                             Text("Добавьте первое измерение")
                         } else {
                             Text(
-                                "${latestWeight.weightGrams.toKgText()} кг",
+                                "${latestWeight.weightGrams.toWeightText(weightUnit)} ${weightUnit.symbol}",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text("Измерено ${latestWeight.measuredAt.toMeasurementDate()}")
                             bodyWeight.getOrNull(1)?.let { previous ->
                                 val delta = latestWeight.weightGrams - previous.weightGrams
-                                Text("К предыдущему: ${delta.toSignedKgText()} кг")
+                                Text("К предыдущему: ${delta.toSignedWeightText(weightUnit)} ${weightUnit.symbol}")
                             }
                             if (bodyWeight.size > 1) {
                                 Spacer(Modifier.height(12.dp))
@@ -214,7 +218,7 @@ fun HomeScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                     ) {
                                         Text(measurement.measuredAt.toMeasurementDate())
-                                        Text("${measurement.weightGrams.toKgText()} кг")
+                                        Text("${measurement.weightGrams.toWeightText(weightUnit)} ${weightUnit.symbol}")
                                     }
                                 }
                             }
@@ -227,7 +231,7 @@ fun HomeScreen(
                             Button(
                                 modifier = Modifier.weight(1f),
                                 onClick = {
-                                    weightInput = latestWeight?.weightGrams.toKgText()
+                                    weightInput = latestWeight?.weightGrams?.toWeightText(weightUnit).orEmpty()
                                     showWeightDialog = true
                                 },
                             ) { Text(if (latestWeight == null) "Добавить" else "Новое измерение") }
@@ -322,6 +326,9 @@ private fun StartOptionCard(
 fun ActiveWorkoutScreen(
     workout: ActiveWorkout?,
     exercises: List<ExerciseDefinition>,
+    weightUnit: WeightUnit,
+    defaultRestSeconds: Int,
+    defaultAutoStartRestTimer: Boolean,
     onSaveSet: (String, Long?, Int?, EffortMark) -> Unit,
     onAddExercise: (String, String) -> Unit,
     onReplaceExercise: (String, String) -> Unit,
@@ -335,11 +342,11 @@ fun ActiveWorkoutScreen(
     var exerciseToReplace by rememberSaveable { mutableStateOf<String?>(null) }
     var exerciseToRemove by rememberSaveable { mutableStateOf<String?>(null) }
     var showFinishWarning by rememberSaveable { mutableStateOf(false) }
-    var restDurationSeconds by rememberSaveable { mutableIntStateOf(90) }
-    var restSecondsRemaining by rememberSaveable { mutableIntStateOf(90) }
+    var restDurationSeconds by rememberSaveable { mutableIntStateOf(defaultRestSeconds) }
+    var restSecondsRemaining by rememberSaveable { mutableIntStateOf(defaultRestSeconds) }
     var restTimerEndMillis by rememberSaveable { mutableLongStateOf(0L) }
     var restTimerRunning by rememberSaveable { mutableStateOf(false) }
-    var restTimerAutoStart by rememberSaveable { mutableStateOf(false) }
+    var restTimerAutoStart by rememberSaveable { mutableStateOf(defaultAutoStartRestTimer) }
     val incompleteSetCount = workout?.exercises?.sumOf { exercise ->
         exercise.sets.count { !it.completed }
     } ?: 0
@@ -507,6 +514,7 @@ fun ActiveWorkoutScreen(
                                     SetInputRow(
                                         set = set,
                                         loadMode = exercise.loadMode,
+                                        weightUnit = weightUnit,
                                         onSave = { load, reps, effort ->
                                             onSaveSet(set.id, load, reps, effort)
                                             if (restTimerAutoStart) startRestTimer(restDurationSeconds)
@@ -628,9 +636,10 @@ fun ActiveWorkoutScreen(
 private fun SetInputRow(
     set: WorkoutSet,
     loadMode: LoadMode,
+    weightUnit: WeightUnit,
     onSave: (Long?, Int?, EffortMark) -> Unit,
 ) {
-    var weight by rememberSaveable(set.id) { mutableStateOf(set.loadGrams.toKgText()) }
+    var weight by rememberSaveable(set.id, weightUnit) { mutableStateOf(set.loadGrams?.toWeightText(weightUnit).orEmpty()) }
     var reps by rememberSaveable(set.id) { mutableStateOf(set.reps?.toString().orEmpty()) }
     var effort by rememberSaveable(set.id) { mutableStateOf(set.effort) }
 
@@ -645,7 +654,7 @@ private fun SetInputRow(
                     modifier = Modifier.weight(1f),
                     value = weight,
                     onValueChange = { weight = it },
-                    label = { Text(loadMode.loadLabel()) },
+                    label = { Text(loadMode.loadLabel(weightUnit)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
@@ -669,10 +678,10 @@ private fun SetInputRow(
         Spacer(Modifier.height(6.dp))
         Button(
             modifier = Modifier.fillMaxWidth(),
-            enabled = (loadMode == LoadMode.BODYWEIGHT || weight.toKgGrams() != null) && reps.toIntOrNull() != null,
+            enabled = (loadMode == LoadMode.BODYWEIGHT || weight.toWeightGrams(weightUnit) != null) && reps.toIntOrNull() != null,
             onClick = {
                 onSave(
-                    if (loadMode == LoadMode.BODYWEIGHT) null else weight.toKgGrams(),
+                    if (loadMode == LoadMode.BODYWEIGHT) null else weight.toWeightGrams(weightUnit),
                     reps.toIntOrNull(),
                     effort,
                 )
@@ -683,27 +692,16 @@ private fun SetInputRow(
     }
 }
 
-private fun Long?.toKgText(): String = this
-    ?.let { BigDecimal.valueOf(it, 3).stripTrailingZeros().toPlainString() }
-    .orEmpty()
-
-private fun Long.toSignedKgText(): String =
-    (if (this > 0) "+" else "") + toKgText()
+private fun Long.toSignedWeightText(unit: WeightUnit): String =
+    (if (this > 0) "+" else "") + toWeightText(unit)
 
 private fun Long.toMeasurementDate(): String =
     SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(this))
 
-private fun String.toKgGrams(): Long? = runCatching {
-    replace(',', '.')
-        .toBigDecimalOrNull()
-        ?.multiply(BigDecimal(1_000))
-        ?.longValueExact()
-}.getOrNull()
-
-private fun LoadMode.loadLabel(): String = when (this) {
-    LoadMode.ASSISTANCE -> "помощь, кг"
-    LoadMode.BODYWEIGHT_ADDED -> "доп. кг"
-    else -> "кг"
+private fun LoadMode.loadLabel(unit: WeightUnit): String = when (this) {
+    LoadMode.ASSISTANCE -> "помощь, ${unit.symbol}"
+    LoadMode.BODYWEIGHT_ADDED -> "доп. ${unit.symbol}"
+    else -> unit.symbol
 }
 
 private fun LoadMode.loadHint(): String = when (this) {

@@ -24,13 +24,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import com.gymnotepad.app.domain.LoadMode
 import com.gymnotepad.app.domain.LoadProgressionType
+import com.gymnotepad.app.data.UserSettingsRepository
+import com.gymnotepad.app.data.WeightUnit
 
 class WorkoutViewModel(
     private val repository: WorkoutRepository,
+    private val settingsRepository: UserSettingsRepository,
 ) : ViewModel() {
     private val analytics = WorkoutAnalytics()
     private val recommendationEngine = WorkoutRecommendationEngine()
     val lastCompletedSessionId = MutableStateFlow<String?>(null)
+    val settings = settingsRepository.settings
 
     val activeWorkout: StateFlow<ActiveWorkout?> = repository.observeActiveWorkout()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -181,13 +185,18 @@ class WorkoutViewModel(
         viewModelScope.launch { repository.deleteBodyWeight(measurementId) }
     }
 
+    fun setWeightUnit(unit: WeightUnit) = settingsRepository.setWeightUnit(unit)
+    fun setRestSeconds(seconds: Int) = settingsRepository.setRestSeconds(seconds)
+    fun setAutoStartRestTimer(enabled: Boolean) = settingsRepository.setAutoStartRestTimer(enabled)
+
     class Factory(
         private val repository: WorkoutRepository,
+        private val settingsRepository: UserSettingsRepository,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(WorkoutViewModel::class.java))
-            return WorkoutViewModel(repository) as T
+            return WorkoutViewModel(repository, settingsRepository) as T
         }
     }
 }

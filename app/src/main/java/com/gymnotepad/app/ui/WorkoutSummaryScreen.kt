@@ -23,15 +23,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.gymnotepad.app.data.CompletedWorkout
 import com.gymnotepad.app.data.ExerciseRecommendation
+import com.gymnotepad.app.data.WeightUnit
+import com.gymnotepad.app.domain.formatWeight
 import com.gymnotepad.app.domain.RecommendationAction
 import com.gymnotepad.app.domain.WorkoutOutcome
-import java.math.BigDecimal
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutSummaryScreen(
     workout: CompletedWorkout?,
     recommendations: List<ExerciseRecommendation>,
+    weightUnit: WeightUnit,
     onDone: () -> Unit,
 ) {
     Scaffold(
@@ -69,7 +71,7 @@ fun WorkoutSummaryScreen(
                     item { Text("Недостаточно данных для рекомендаций") }
                 } else {
                     items(recommendations, key = { it.exerciseKey }) { item ->
-                        RecommendationCard(item)
+                        RecommendationCard(item, weightUnit)
                     }
                 }
             }
@@ -85,7 +87,7 @@ fun WorkoutSummaryScreen(
 }
 
 @Composable
-private fun RecommendationCard(item: ExerciseRecommendation) {
+private fun RecommendationCard(item: ExerciseRecommendation, weightUnit: WeightUnit) {
     val recommendation = item.recommendation
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -99,11 +101,11 @@ private fun RecommendationCard(item: ExerciseRecommendation) {
             Text(recommendation.reason)
             recommendation.suggestedLoadGrams?.let { suggested ->
                 if (recommendation.action == RecommendationAction.INCREASE_LOAD) {
-                    Text("Следующая нагрузка: ${suggested.formatKg()}", fontWeight = FontWeight.Bold)
+                    Text("Следующая нагрузка: ${suggested.formatWeight(weightUnit)}", fontWeight = FontWeight.Bold)
                 }
             }
             if (recommendation.action == RecommendationAction.INCREASE_LOAD && item.platesPerSideGrams.isNotEmpty()) {
-                Text("На одну сторону: ${item.platesPerSideGrams.groupingBy { it }.eachCount().entries.joinToString(" + ") { (plate, count) -> "$count × ${plate.formatKg()}" }}")
+                Text("Блины на одну сторону: ${item.platesPerSideGrams.groupingBy { it }.eachCount().entries.joinToString(" + ") { (plate, count) -> "$count × ${plate.formatWeight(WeightUnit.KILOGRAMS)}" }}")
             }
             if (recommendation.successStreak > 0) {
                 Text("Успешных тренировок подряд: ${recommendation.successStreak}")
@@ -137,4 +139,3 @@ private fun formatDuration(milliseconds: Long): String {
     return if (hours > 0) "$hours ч $minutes мин" else "$minutes мин"
 }
 
-private fun Long.formatKg(): String = BigDecimal.valueOf(this, 3).stripTrailingZeros().toPlainString() + " кг"

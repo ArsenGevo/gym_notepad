@@ -13,6 +13,7 @@ class MainActivity : ComponentActivity() {
     private val workoutViewModel: WorkoutViewModel by viewModels {
         WorkoutViewModel.Factory(
             (application as GymNotepadApplication).workoutRepository,
+            (application as GymNotepadApplication).userSettingsRepository,
         )
     }
 

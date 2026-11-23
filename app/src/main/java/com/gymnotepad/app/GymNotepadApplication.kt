@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.room.Room
 import com.gymnotepad.app.data.RoomWorkoutRepository
 import com.gymnotepad.app.data.WorkoutRepository
+import com.gymnotepad.app.data.UserSettingsRepository
 import com.gymnotepad.app.data.local.GymDatabase
 
 class GymNotepadApplication : Application() {
+    val userSettingsRepository: UserSettingsRepository by lazy { UserSettingsRepository(applicationContext) }
     val workoutRepository: WorkoutRepository by lazy {
         val database = Room.databaseBuilder(
             applicationContext,

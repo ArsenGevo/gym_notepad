@@ -34,6 +34,10 @@ import com.gymnotepad.app.data.BodyWeightMeasurement
 import com.gymnotepad.app.data.ExerciseProgress
 import com.gymnotepad.app.data.WorkoutSet
 import com.gymnotepad.app.domain.LoadMode
+import com.gymnotepad.app.data.WeightUnit
+import com.gymnotepad.app.domain.formatWeight
+import com.gymnotepad.app.domain.symbol
+import com.gymnotepad.app.domain.toWeightValue
 import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -46,6 +50,7 @@ fun HistoryScreen(
     history: List<CompletedWorkout>,
     progress: List<ExerciseProgress>,
     bodyWeight: List<BodyWeightMeasurement>,
+    weightUnit: WeightUnit,
     onNavigate: (AppRoute) -> Unit,
 ) {
     Scaffold(
@@ -68,7 +73,7 @@ fun HistoryScreen(
             if (bodyWeight.isEmpty()) {
                 item { Text("Добавьте измерения на главной, чтобы увидеть динамику.") }
             } else {
-                item { BodyWeightProgressCard(bodyWeight) }
+                item { BodyWeightProgressCard(bodyWeight, weightUnit) }
             }
 
             item {
@@ -77,7 +82,7 @@ fun HistoryScreen(
             if (progress.isEmpty()) {
                 item { Text("Завершите первую тренировку, чтобы появилась аналитика.") }
             } else {
-                items(progress, key = { it.exerciseKey }) { item -> ProgressCard(item) }
+                items(progress, key = { it.exerciseKey }) { item -> ProgressCard(item, weightUnit) }
             }
 
             item {
@@ -87,21 +92,21 @@ fun HistoryScreen(
             if (history.isEmpty()) {
                 item { Text("История пока пуста") }
             } else {
-                items(history, key = { it.id }) { workout -> WorkoutHistoryCard(workout) }
+                items(history, key = { it.id }) { workout -> WorkoutHistoryCard(workout, weightUnit) }
             }
         }
     }
 }
 
 @Composable
-private fun BodyWeightProgressCard(measurementsNewestFirst: List<BodyWeightMeasurement>) {
+private fun BodyWeightProgressCard(measurementsNewestFirst: List<BodyWeightMeasurement>, weightUnit: WeightUnit) {
     val latest = measurementsNewestFirst.first()
     val previous = measurementsNewestFirst.getOrNull(1)
     val points = measurementsNewestFirst.take(12).asReversed()
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(
-                text = "Сейчас: ${latest.weightGrams.formatKg()}",
+                text = "Сейчас: ${latest.weightGrams.formatWeight(weightUnit)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
@@ -109,24 +114,24 @@ private fun BodyWeightProgressCard(measurementsNewestFirst: List<BodyWeightMeasu
                 val delta = latest.weightGrams - it.weightGrams
                 Text(
                     when {
-                        delta > 0 -> "К предыдущему: +${delta.formatKg()}"
-                        delta < 0 -> "К предыдущему: −${(-delta).formatKg()}"
+                        delta > 0 -> "К предыдущему: +${delta.formatWeight(weightUnit)}"
+                        delta < 0 -> "К предыдущему: −${(-delta).formatWeight(weightUnit)}"
                         else -> "Без изменений относительно предыдущего"
                     },
                 )
             }
             Spacer(Modifier.height(8.dp))
             TrendChart(
-                values = points.map { it.weightGrams / 1_000f },
+                values = points.map { it.weightGrams.toWeightValue(weightUnit) },
                 timestamps = points.map { it.measuredAt },
-                valueFormatter = { value -> "${value.formatChartNumber()} кг" },
+                valueFormatter = { value -> "${value.formatChartNumber()} ${weightUnit.symbol}" },
             )
         }
     }
 }
 
 @Composable
-private fun ProgressCard(progress: ExerciseProgress) {
+private fun ProgressCard(progress: ExerciseProgress, weightUnit: WeightUnit) {
     val canShowLoad = progress.trend.any { it.loadGrams != null }
     var metric by rememberSaveable(progress.exerciseKey) {
         mutableStateOf(if (canShowLoad) ChartMetric.Load else ChartMetric.Repetitions)
@@ -134,12 +139,12 @@ private fun ProgressCard(progress: ExerciseProgress) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Text(progress.exerciseName, fontWeight = FontWeight.Bold)
-            Text("Рабочая нагрузка: ${progress.currentLoadGrams.formatLoad(progress.loadMode)}")
+            Text("Рабочая нагрузка: ${progress.currentLoadGrams.formatLoad(progress.loadMode, weightUnit)}")
             progress.difficultyChangeGrams?.let { delta ->
                 Text(
                     text = when {
-                        delta > 0 -> "Сложность выросла на ${delta.formatKg()}"
-                        delta < 0 -> "Сложность снизилась на ${(-delta).formatKg()}"
+                        delta > 0 -> "Сложность выросла на ${delta.formatWeight(weightUnit)}"
+                        delta < 0 -> "Сложность снизилась на ${(-delta).formatWeight(weightUnit)}"
                         else -> "Рабочая нагрузка без изменений"
                     },
                     color = if (delta > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -177,9 +182,9 @@ private fun ProgressCard(progress: ExerciseProgress) {
                     }
                     val loadPoints = recent.filter { it.loadGrams != null }
                     TrendChart(
-                        values = loadPoints.map { requireNotNull(it.loadGrams) / 1_000f },
+                        values = loadPoints.map { requireNotNull(it.loadGrams).toWeightValue(weightUnit) },
                         timestamps = loadPoints.map { it.completedAt },
-                        valueFormatter = { value -> "${value.formatChartNumber()} кг" },
+                        valueFormatter = { value -> "${value.formatChartNumber()} ${weightUnit.symbol}" },
                     )
                 } else {
                     Text("Сумма повторений на рабочей нагрузке")
@@ -255,7 +260,7 @@ private fun TrendChart(
 }
 
 @Composable
-private fun WorkoutHistoryCard(workout: CompletedWorkout) {
+private fun WorkoutHistoryCard(workout: CompletedWorkout, weightUnit: WeightUnit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -269,7 +274,7 @@ private fun WorkoutHistoryCard(workout: CompletedWorkout) {
                     exercise.sets
                         .filter(WorkoutSet::completed)
                         .joinToString(" · ") { set ->
-                            "${set.loadGrams.formatLoad(exercise.loadMode)} × ${set.reps ?: "—"}"
+                            "${set.loadGrams.formatLoad(exercise.loadMode, weightUnit)} × ${set.reps ?: "—"}"
                         }
                         .ifEmpty { "Нет завершённых подходов" },
                 )
@@ -278,16 +283,12 @@ private fun WorkoutHistoryCard(workout: CompletedWorkout) {
     }
 }
 
-private fun Long?.formatLoad(mode: LoadMode): String = when {
+private fun Long?.formatLoad(mode: LoadMode, unit: WeightUnit): String = when {
     mode == LoadMode.BODYWEIGHT -> "вес тела"
     this == null -> "—"
-    mode == LoadMode.ASSISTANCE -> "${formatKg()} помощи"
-    else -> formatKg()
+    mode == LoadMode.ASSISTANCE -> "${formatWeight(unit)} помощи"
+    else -> formatWeight(unit)
 }
-
-private fun Long.formatKg(): String = BigDecimal.valueOf(this, 3)
-    .stripTrailingZeros()
-    .toPlainString() + " кг"
 
 private fun Float.formatChartNumber(): String = BigDecimal.valueOf(toDouble())
     .setScale(1, java.math.RoundingMode.HALF_UP)
