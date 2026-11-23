@@ -51,11 +51,26 @@ class WorkoutAnalyticsTest {
         assertEquals(5_000L, result.difficultyChangeGrams)
     }
 
-    private fun workout(exercise: WorkoutExercise) = CompletedWorkout(
+    @Test
+    fun `builds chronological load and repetition trend`() {
+        val result = analytics.calculate(
+            listOf(
+                workout(exercise(LoadMode.EXTERNAL_TOTAL, 34_000, listOf(8, 8, 8)), completedAt = 3),
+                workout(exercise(LoadMode.EXTERNAL_TOTAL, 32_000, listOf(10, 10, 9)), completedAt = 2),
+                workout(exercise(LoadMode.EXTERNAL_TOTAL, 30_000, listOf(12, 12, 12)), completedAt = 1),
+            ),
+        ).single()
+
+        assertEquals(listOf(1L, 2L, 3L), result.trend.map { it.completedAt })
+        assertEquals(listOf(30_000L, 32_000L, 34_000L), result.trend.map { it.loadGrams })
+        assertEquals(listOf(36, 29, 24), result.trend.map { it.repsAtLoad })
+    }
+
+    private fun workout(exercise: WorkoutExercise, completedAt: Long = 1) = CompletedWorkout(
         id = "workout-${exercise.sets.first().loadGrams}",
         name = "Тренировка",
         startedAt = 0,
-        completedAt = 1,
+        completedAt = completedAt,
         exercises = listOf(exercise),
     )
 

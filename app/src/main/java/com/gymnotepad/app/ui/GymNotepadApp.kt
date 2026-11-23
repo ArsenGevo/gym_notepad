@@ -85,6 +85,7 @@ fun GymNotepadApp(viewModel: WorkoutViewModel) {
             HistoryScreen(
                 history = history,
                 progress = progress,
+                bodyWeight = bodyWeight,
                 onNavigate = { navController.navigate(it.route) },
             )
         }

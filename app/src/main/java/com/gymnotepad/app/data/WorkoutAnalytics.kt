@@ -11,6 +11,13 @@ data class ExerciseProgress(
     val currentRepsAtLoad: Int,
     val previousRepsAtSameLoad: Int?,
     val repsChangeAtSameLoad: Int?,
+    val trend: List<ExerciseProgressPoint>,
+)
+
+data class ExerciseProgressPoint(
+    val completedAt: Long,
+    val loadGrams: Long?,
+    val repsAtLoad: Int,
 )
 
 class WorkoutAnalytics {
@@ -20,6 +27,7 @@ class WorkoutAnalytics {
                 Occurrence(
                     key = exercise.definitionId ?: "${exercise.name}|${exercise.loadMode}",
                     exercise = exercise,
+                    completedAt = workout.completedAt,
                 )
             }
         }.groupBy(Occurrence::key)
@@ -44,6 +52,14 @@ class WorkoutAnalytics {
                 currentRepsAtLoad = currentReps,
                 previousRepsAtSameLoad = previousSameReps,
                 repsChangeAtSameLoad = previousSameReps?.let { currentReps - it },
+                trend = exerciseHistory.asReversed().map { occurrence ->
+                    val load = occurrence.exercise.representativeLoad()
+                    ExerciseProgressPoint(
+                        completedAt = occurrence.completedAt,
+                        loadGrams = load,
+                        repsAtLoad = occurrence.exercise.repsAt(load),
+                    )
+                },
             )
         }.sortedBy(ExerciseProgress::exerciseName)
     }
@@ -52,6 +68,7 @@ class WorkoutAnalytics {
 private data class Occurrence(
     val key: String,
     val exercise: WorkoutExercise,
+    val completedAt: Long,
 )
 
 private fun WorkoutExercise.representativeLoad(): Long? {
